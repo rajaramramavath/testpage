@@ -1,68 +1,157 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Admin Timetable</title>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 🔑 Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
+      authDomain: "admindemon-b3823.firebaseapp.com",
+      databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com",
+      projectId: "admindemon-b3823",
+      storageBucket: "admindemon-b3823.appspot.com",
+      messagingSenderId: "33424574422",
+      appId: "1:33424574422:web:96db3c6388d89d162c4677",
+      measurementId: "G-188H3B2LSZ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        alert("Login failed: " + err.message);
+      }
+    }
+
+    function logout() {
+      signOut(auth);
+    }
+
+    async function loadSections() {
+      const select = document.getElementById("sectionSelect");
+      select.innerHTML = "<option value=''>Select Section</option>";
+      const snapshot = await getDocs(collection(db, "sections"));
+      snapshot.forEach(docSnap => {
+        const opt = document.createElement("option");
+        opt.value = docSnap.id;
+        opt.textContent = docSnap.data().name;
+        select.appendChild(opt);
+      });
+    }
+
+    async function createSection() {
+      const name = document.getElementById("newSection").value;
+      if (!name) return alert("Enter section name");
+      await addDoc(collection(db, "sections"), { name, subjects: {} });
+      loadSections();
+    }
+
+    async function deleteSection() {
+      const id = document.getElementById("sectionSelect").value;
+      if (!id) return alert("Select section");
+      await deleteDoc(doc(db, "sections", id));
+      loadSections();
+    }
+
+    async function addSubject() {
+      const id = document.getElementById("sectionSelect").value;
+      const day = document.getElementById("day").value;
+      const name = document.getElementById("subjectName").value;
+      const time = document.getElementById("subjectTime").value;
+
+      if (!id || !day || !name || !time) return alert("Fill all fields");
+
+      const sectionRef = doc(db, "sections", id);
+      const sectionSnap = await getDocs(collection(db, "sections"));
+      const sectionDoc = sectionSnap.docs.find(d => d.id === id);
+      const data = sectionDoc.data();
+
+      if (!data.subjects) data.subjects = {};
+      if (!data.subjects[day]) data.subjects[day] = [];
+      data.subjects[day].push({ name, time });
+
+      await updateDoc(sectionRef, { subjects: data.subjects });
+      alert("Subject added");
+    }
+
+    async function deleteSubject() {
+      const id = document.getElementById("sectionSelect").value;
+      const day = document.getElementById("day").value;
+      const name = document.getElementById("subjectName").value;
+
+      if (!id || !day || !name) return alert("Fill all fields");
+
+      const sectionRef = doc(db, "sections", id);
+      const sectionSnap = await getDocs(collection(db, "sections"));
+      const sectionDoc = sectionSnap.docs.find(d => d.id === id);
+      const data = sectionDoc.data();
+
+      if (!data.subjects || !data.subjects[day]) return alert("No subjects");
+
+      data.subjects[day] = data.subjects[day].filter(s => s.name !== name);
+      await updateDoc(sectionRef, { subjects: data.subjects });
+      alert("Subject deleted");
+    }
+
+    onAuthStateChanged(auth, user => {
+      document.getElementById("loginForm").style.display = user ? "none" : "block";
+      document.getElementById("adminPanel").style.display = user ? "block" : "none";
+      if (user) loadSections();
+    });
+
+    window.login = login;
+    window.logout = logout;
+    window.createSection = createSection;
+    window.deleteSection = deleteSection;
+    window.addSubject = addSubject;
+    window.deleteSubject = deleteSubject;
+  </script>
 </head>
 <body>
   <h1>Admin Panel</h1>
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <button id="login">Login</button>
-  <hr>
-  <input id="sectionName" placeholder="New Section">
-  <button id="createSection">Create Section</button>
-  <hr>
-  <input id="sec" placeholder="Section">
-  <input id="day" placeholder="Day">
-  <input id="subject" placeholder="Subject">
-  <input id="time" placeholder="Time">
-  <button id="addEntry">Add Entry</button>
-  <hr>
-  <input id="delSec" placeholder="Section">
-  <input id="delDay" placeholder="Day">
-  <button id="deleteDay">Delete Day</button>
 
-  <script type="module">
-    import { db, auth, ref, set, push, remove, signInWithEmailAndPassword } from './firebase.js';
+  <div id="loginForm">
+    <h2>Login</h2>
+    <input id="email" type="email" placeholder="Email"><br>
+    <input id="password" type="password" placeholder="Password"><br>
+    <button onclick="login()">Login</button>
+  </div>
 
-    let loggedIn = false;
+  <div id="adminPanel" style="display:none;">
+    <button onclick="logout()">Logout</button>
 
-    document.getElementById('login').addEventListener('click', async () => {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        alert('Logged in');
-        loggedIn = true;
-      } catch (err) {
-        alert('Login failed: ' + err.message);
-      }
-    });
+    <h2>Sections</h2>
+    <input id="newSection" placeholder="New Section Name">
+    <button onclick="createSection()">Create Section</button>
+    <br><br>
+    <select id="sectionSelect"></select>
+    <button onclick="deleteSection()">Delete Section</button>
 
-    document.getElementById('createSection').addEventListener('click', async () => {
-      if (!loggedIn) return alert('Login first');
-      const section = document.getElementById('sectionName').value;
-      await set(ref(db, 'timetable/' + section), {});
-      alert('Section created');
-    });
-
-    document.getElementById('addEntry').addEventListener('click', async () => {
-      if (!loggedIn) return alert('Login first');
-      const sec = document.getElementById('sec').value;
-      const day = document.getElementById('day').value;
-      const subject = document.getElementById('subject').value;
-      const time = document.getElementById('time').value;
-      await push(ref(db, `timetable/${sec}/${day}`), { subject, time });
-      alert('Entry added');
-    });
-
-    document.getElementById('deleteDay').addEventListener('click', async () => {
-      if (!loggedIn) return alert('Login first');
-      const sec = document.getElementById('delSec').value;
-      const day = document.getElementById('delDay').value;
-      await remove(ref(db, `timetable/${sec}/${day}`));
-      alert('Day deleted');
-    });
-  </script>
+    <h2>Subjects</h2>
+    <input id="subjectName" placeholder="Subject Name"><br>
+    <input id="subjectTime" placeholder="Time (e.g. 10:00 AM)"><br>
+    <select id="day">
+      <option value="">Select Day</option>
+      <option>Monday</option>
+      <option>Tuesday</option>
+      <option>Wednesday</option>
+      <option>Thursday</option>
+      <option>Friday</option>
+      <option>Saturday</option>
+    </select><br>
+    <button onclick="addSubject()">Add Subject</button>
+    <button onclick="deleteSubject()">Delete Subject</button>
+  </div>
 </body>
 </html>
