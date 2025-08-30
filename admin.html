@@ -1,91 +1,69 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Admin Upload</title>
-  <script type="module">
-    // Import Firebase SDKs
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+  <head>
+    <meta charset="UTF-8">
+    <title>Firebase RD Test</title>
+    <script type="module">
+      // Import Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+      import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
 
-    // Your Firebase config (use the one you posted)
-    const firebaseConfig = {
-      apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
-      authDomain: "admindemon-b3823.firebaseapp.com",
-      projectId: "admindemon-b3823",
-      storageBucket: "admindemon-b3823.firebasestorage.app",
-      messagingSenderId: "33424574422",
-      appId: "1:33424574422:web:96db3c6388d89d162c4677",
-      measurementId: "G-188H3B2LSZ"
-    };
+      // Your Firebase config (keep what you already have)
+      const firebaseConfig = {
+        apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
+        authDomain: "admindemon-b3823.firebaseapp.com",
+        projectId: "admindemon-b3823",
+        storageBucket: "admindemon-b3823.firebasestorage.app",
+        messagingSenderId: "33424574422",
+        appId: "1:33424574422:web:96db3c6388d89d162c4677",
+        measurementId: "G-188H3B2LSZ",
+        databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com"
+      };
 
-    // Init Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const storage = getStorage(app);
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      const auth = getAuth(app);
 
-    // Elements
-    const loginDiv = document.getElementById('loginDiv');
-    const uploadDiv = document.getElementById('uploadDiv');
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const uploadBtn = document.getElementById('uploadBtn');
+      // --- Change this to your admin test email and password ---
+      const TEST_EMAIL = "YOUR_ADMIN_EMAIL";
+      const TEST_PASSWORD = "YOUR_ADMIN_PASSWORD";
 
-    // Auth listeners
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loginDiv.style.display = 'none';
-        uploadDiv.style.display = 'block';
-      } else {
-        loginDiv.style.display = 'block';
-        uploadDiv.style.display = 'none';
-      }
-    });
+      // Login and test write/read
+      signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
+        .then(() => {
+          console.log("Logged in!");
 
-    loginBtn.onclick = async () => {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        alert('Logged in!');
-      } catch (err) {
-        alert('Login failed: ' + err.message);
-      }
-    };
+          const testRef = ref(db, 'testNode');
 
-    logoutBtn.onclick = async () => {
-      await signOut(auth);
-      alert('Logged out!');
-    };
+          // Write test data
+          return set(testRef, {
+            message: "Hello Firebase! " + new Date().toISOString()
+          });
+        })
+        .then(() => {
+          console.log("Write successful. Now reading...");
+          const testRef = ref(db, 'testNode');
+          return get(testRef);
+        })
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            console.log("Read data:", snapshot.val());
+          } else {
+            console.log("No data found!");
+          }
+        })
+        .catch((err) => {
+          console.error("Error:", err);
+        });
 
-    uploadBtn.onclick = async () => {
-      const file = document.getElementById('fileInput').files[0];
-      if (!file) return alert('Please select a file.');
-      try {
-        const fileRef = ref(storage, 'uploads/' + file.name);
-        await uploadBytes(fileRef, file);
-        alert('Uploaded successfully!');
-      } catch (err) {
-        alert('Upload failed: ' + err.message);
-      }
-    };
-  </script>
-</head>
-<body>
-  <h1>Admin Panel</h1>
-
-  <div id="loginDiv">
-    <h3>Login</h3>
-    <input type="email" id="email" placeholder="Email"><br>
-    <input type="password" id="password" placeholder="Password"><br>
-    <button id="loginBtn">Login</button>
-  </div>
-
-  <div id="uploadDiv" style="display:none;">
-    <h3>Upload File</h3>
-    <input type="file" id="fileInput"><br>
-    <button id="uploadBtn">Upload</button>
-    <button id="logoutBtn">Logout</button>
-  </div>
-</body>
+      // Optional: sign out after test
+      // signOut(auth);
+    </script>
+  </head>
+  <body>
+    <h1>Firebase RD Test</h1>
+    <p>Open the browser console (F12) to see results.</p>
+  </body>
 </html>
