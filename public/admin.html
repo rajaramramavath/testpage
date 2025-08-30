@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <title>Admin Panel</title>
   <script type="module">
+    // ✅ Import Firebase from CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+      from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } 
+      from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // 🔑 Your Firebase config
     const firebaseConfig = {
@@ -54,6 +57,7 @@
       const name = document.getElementById("newSection").value;
       if (!name) return alert("Enter section name");
       await addDoc(collection(db, "sections"), { name, subjects: {} });
+      document.getElementById("newSection").value = "";
       loadSections();
     }
 
@@ -72,17 +76,20 @@
 
       if (!id || !day || !name || !time) return alert("Fill all fields");
 
-      const sectionRef = doc(db, "sections", id);
-      const sectionSnap = await getDocs(collection(db, "sections"));
-      const sectionDoc = sectionSnap.docs.find(d => d.id === id);
+      // Fetch current data
+      const snapshot = await getDocs(collection(db, "sections"));
+      const sectionDoc = snapshot.docs.find(d => d.id === id);
       const data = sectionDoc.data();
 
       if (!data.subjects) data.subjects = {};
       if (!data.subjects[day]) data.subjects[day] = [];
       data.subjects[day].push({ name, time });
 
-      await updateDoc(sectionRef, { subjects: data.subjects });
+      await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
+
       alert("Subject added");
+      document.getElementById("subjectName").value = "";
+      document.getElementById("subjectTime").value = "";
     }
 
     async function deleteSubject() {
@@ -92,24 +99,28 @@
 
       if (!id || !day || !name) return alert("Fill all fields");
 
-      const sectionRef = doc(db, "sections", id);
-      const sectionSnap = await getDocs(collection(db, "sections"));
-      const sectionDoc = sectionSnap.docs.find(d => d.id === id);
+      const snapshot = await getDocs(collection(db, "sections"));
+      const sectionDoc = snapshot.docs.find(d => d.id === id);
       const data = sectionDoc.data();
 
-      if (!data.subjects || !data.subjects[day]) return alert("No subjects");
+      if (!data.subjects || !data.subjects[day]) return alert("No subjects found");
 
       data.subjects[day] = data.subjects[day].filter(s => s.name !== name);
-      await updateDoc(sectionRef, { subjects: data.subjects });
+
+      await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
+
       alert("Subject deleted");
+      document.getElementById("subjectName").value = "";
     }
 
+    // Handle login state
     onAuthStateChanged(auth, user => {
       document.getElementById("loginForm").style.display = user ? "none" : "block";
       document.getElementById("adminPanel").style.display = user ? "block" : "none";
       if (user) loadSections();
     });
 
+    // Expose to window
     window.login = login;
     window.logout = logout;
     window.createSection = createSection;
@@ -121,6 +132,7 @@
 <body>
   <h1>Admin Panel</h1>
 
+  <!-- Login Form -->
   <div id="loginForm">
     <h2>Login</h2>
     <input id="email" type="email" placeholder="Email"><br>
@@ -128,6 +140,7 @@
     <button onclick="login()">Login</button>
   </div>
 
+  <!-- Admin Dashboard -->
   <div id="adminPanel" style="display:none;">
     <button onclick="logout()">Logout</button>
 
