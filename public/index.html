@@ -110,48 +110,63 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
 
-// Populate dropdowns
+// Populate all dropdowns with sections
 function populateSections() {
-  db.ref('sections').once('value', snapshot => {
-    const sections = snapshot.val() || {};
-    const sectionSelect = document.getElementById('sectionSelect');
-    const adminSectionSelect = document.getElementById('adminSectionSelect');
-    const delSectionSelect = document.getElementById('delSectionSelect');
+  db.ref('sections').once('value')
+    .then(snapshot => {
+      const sections = snapshot.val() || {};
+      const sectionSelects = [
+        document.getElementById('sectionSelect'),
+        document.getElementById('adminSectionSelect'),
+        document.getElementById('delSectionSelect')
+      ];
+      
+      sectionSelects.forEach(sel => sel.innerHTML = '');
 
-    sectionSelect.innerHTML = '';
-    adminSectionSelect.innerHTML = '';
-    delSectionSelect.innerHTML = '';
+      for (let section in sections) {
+        sectionSelects.forEach(sel => {
+          let opt = document.createElement('option');
+          opt.value = section;
+          opt.textContent = section;
+          sel.appendChild(opt);
+        });
+      }
 
-    for (let section in sections) {
-      [sectionSelect, adminSectionSelect, delSectionSelect].forEach(sel => {
-        let opt = document.createElement('option');
-        opt.value = section;
-        opt.textContent = section;
-        sel.appendChild(opt);
-      });
-    }
-  });
+      // If no sections exist, show placeholder
+      if (Object.keys(sections).length === 0) {
+        sectionSelects.forEach(sel => {
+          let opt = document.createElement('option');
+          opt.textContent = "No sections";
+          opt.value = "";
+          sel.appendChild(opt);
+        });
+      }
+    })
+    .catch(err => console.error("Error loading sections:", err));
 }
 
-// Display schedule
+// Display schedule for selected section & day
 function displaySchedule() {
   const section = document.getElementById('sectionSelect').value;
   const day = document.getElementById('daySelect').value;
   const tbody = document.getElementById('scheduleTable').querySelector('tbody');
   tbody.innerHTML = '';
 
-  db.ref(`sections/${section}/${day}`).once('value', snapshot => {
-    const entries = snapshot.val() || [];
-    if (!entries || entries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2">No data</td></tr>';
-    } else {
-      entries.forEach(e => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td>${e.subject}</td><td>${e.time}</td>`;
-        tbody.appendChild(row);
-      });
-    }
-  });
+  if (!section) return tbody.innerHTML = '<tr><td colspan="2">No section selected</td></tr>';
+
+  db.ref(`sections/${section}/${day}`).once('value')
+    .then(snapshot => {
+      const entries = snapshot.val() || [];
+      if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2">No data</td></tr>';
+      } else {
+        entries.forEach(e => {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${e.subject}</td><td>${e.time}</td>`;
+          tbody.appendChild(row);
+        });
+      }
+    });
 }
 
 // Admin login
@@ -168,36 +183,49 @@ function adminLogin() {
     .catch(err => alert("Login failed: " + err.message));
 }
 
-// Monitor auth state
+// Auth state listener
 auth.onAuthStateChanged(user => {
   document.getElementById('adminPanel').style.display = user ? 'block' : 'none';
   if(user) populateSections();
 });
 
-// Create section
+// Create new section
 function createSection() {
   const newSec = document.getElementById('newSection').value.trim();
   if (!newSec) return alert("Enter a section name");
 
   const days = { "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": [] };
+  
   db.ref(`sections/${newSec}`).set(days)
-    .then(() => { populateSections(); alert("Section created!"); });
+    .then(() => {
+      populateSections();
+      document.getElementById('newSection').value = '';
+      alert("Section created!");
+    })
+    .catch(err => alert("Error creating section: " + err.message));
 }
 
-// Add subject
+// Add subject to section/day
 function addSubject() {
   const section = document.getElementById('adminSectionSelect').value;
   const day = document.getElementById('adminDaySelect').value;
   const subj = document.getElementById('subjectName').value.trim();
   const time = document.getElementById('subjectTime').value.trim();
-  if (!subj || !time) return alert("Enter subject and time");
+  if (!section || !subj || !time) return alert("Enter section, subject, and time");
 
   const ref = db.ref(`sections/${section}/${day}`);
-  ref.once('value').then(snapshot => {
-    const arr = snapshot.val() || [];
-    arr.push({subject: subj, time: time});
-    ref.set(arr).then(() => { alert("Subject added!"); });
-  });
+  ref.once('value')
+    .then(snapshot => {
+      const arr = snapshot.val() || [];
+      arr.push({subject: subj, time: time});
+      return ref.set(arr);
+    })
+    .then(() => {
+      document.getElementById('subjectName').value = '';
+      document.getElementById('subjectTime').value = '';
+      alert("Subject added!");
+    })
+    .catch(err => alert("Error adding subject: " + err.message));
 }
 
 // Delete last subject
@@ -205,17 +233,22 @@ function deleteLastSubject() {
   const section = document.getElementById('delSectionSelect').value;
   const day = document.getElementById('delDaySelect').value;
 
+  if (!section) return alert("Select a section");
+
   const ref = db.ref(`sections/${section}/${day}`);
-  ref.once('value').then(snapshot => {
-    const arr = snapshot.val() || [];
-    if (arr.length === 0) return alert("No subject to delete");
-    arr.pop();
-    ref.set(arr).then(() => { alert("Last subject deleted!"); });
-  });
+  ref.once('value')
+    .then(snapshot => {
+      const arr = snapshot.val() || [];
+      if (arr.length === 0) return alert("No subject to delete");
+      arr.pop();
+      return ref.set(arr);
+    })
+    .then(() => alert("Last subject deleted!"))
+    .catch(err => alert("Error deleting subject: " + err.message));
 }
 
-// Initial load
-populateSections();
+// Only populate sections if user is already logged in
+auth.onAuthStateChanged(user => { if(user) populateSections(); });
 </script>
 </body>
 </html>
