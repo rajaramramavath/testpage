@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Upload</title>
+  <script type="module">
+    // Import Firebase SDKs
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+    // Your Firebase config (use the one you posted)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
+      authDomain: "admindemon-b3823.firebaseapp.com",
+      projectId: "admindemon-b3823",
+      storageBucket: "admindemon-b3823.firebasestorage.app",
+      messagingSenderId: "33424574422",
+      appId: "1:33424574422:web:96db3c6388d89d162c4677",
+      measurementId: "G-188H3B2LSZ"
+    };
+
+    // Init Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+
+    // Elements
+    const loginDiv = document.getElementById('loginDiv');
+    const uploadDiv = document.getElementById('uploadDiv');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    // Auth listeners
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loginDiv.style.display = 'none';
+        uploadDiv.style.display = 'block';
+      } else {
+        loginDiv.style.display = 'block';
+        uploadDiv.style.display = 'none';
+      }
+    });
+
+    loginBtn.onclick = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        alert('Logged in!');
+      } catch (err) {
+        alert('Login failed: ' + err.message);
+      }
+    };
+
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+      alert('Logged out!');
+    };
+
+    uploadBtn.onclick = async () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return alert('Please select a file.');
+      try {
+        const fileRef = ref(storage, 'uploads/' + file.name);
+        await uploadBytes(fileRef, file);
+        alert('Uploaded successfully!');
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      }
+    };
+  </script>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+
+  <div id="loginDiv">
+    <h3>Login</h3>
+    <input type="email" id="email" placeholder="Email"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <div id="uploadDiv" style="display:none;">
+    <h3>Upload File</h3>
+    <input type="file" id="fileInput"><br>
+    <button id="uploadBtn">Upload</button>
+    <button id="logoutBtn">Logout</button>
+  </div>
+</body>
+</html>
