@@ -110,9 +110,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
 
-// Populate section dropdowns
+// Populate dropdowns
 function populateSections() {
-  firebase.database().ref('sections').once('value', snapshot => {
+  db.ref('sections').once('value', snapshot => {
     const sections = snapshot.val() || {};
     const sectionSelect = document.getElementById('sectionSelect');
     const adminSectionSelect = document.getElementById('adminSectionSelect');
@@ -123,9 +123,12 @@ function populateSections() {
     delSectionSelect.innerHTML = '';
 
     for (let section in sections) {
-      let opt1 = document.createElement('option'); opt1.value = section; opt1.textContent = section; sectionSelect.appendChild(opt1);
-      let opt2 = document.createElement('option'); opt2.value = section; opt2.textContent = section; adminSectionSelect.appendChild(opt2);
-      let opt3 = document.createElement('option'); opt3.value = section; opt3.textContent = section; delSectionSelect.appendChild(opt3);
+      [sectionSelect, adminSectionSelect, delSectionSelect].forEach(sel => {
+        let opt = document.createElement('option');
+        opt.value = section;
+        opt.textContent = section;
+        sel.appendChild(opt);
+      });
     }
   });
 }
@@ -137,14 +140,15 @@ function displaySchedule() {
   const tbody = document.getElementById('scheduleTable').querySelector('tbody');
   tbody.innerHTML = '';
 
-  firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
+  db.ref(`sections/${section}/${day}`).once('value', snapshot => {
     const entries = snapshot.val() || [];
-    if (entries.length === 0) {
+    if (!entries || entries.length === 0) {
       tbody.innerHTML = '<tr><td colspan="2">No data</td></tr>';
     } else {
       entries.forEach(e => {
-        let row = `<tr><td>${e.subject}</td><td>${e.time}</td></tr>`;
-        tbody.innerHTML += row;
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${e.subject}</td><td>${e.time}</td>`;
+        tbody.appendChild(row);
       });
     }
   });
@@ -156,36 +160,28 @@ function adminLogin() {
   const password = document.getElementById('adminPassword').value;
 
   auth.signInWithEmailAndPassword(email, password)
-    .then((userCredential) => {
+    .then(() => {
       document.getElementById('adminPanel').style.display = 'block';
       populateSections();
       alert("Admin logged in!");
     })
-    .catch((error) => {
-      alert("Login failed: " + error.message);
-    });
+    .catch(err => alert("Login failed: " + err.message));
 }
 
 // Monitor auth state
 auth.onAuthStateChanged(user => {
-  if(user) {
-    document.getElementById('adminPanel').style.display = 'block';
-    populateSections();
-  } else {
-    document.getElementById('adminPanel').style.display = 'none';
-  }
+  document.getElementById('adminPanel').style.display = user ? 'block' : 'none';
+  if(user) populateSections();
 });
 
 // Create section
 function createSection() {
   const newSec = document.getElementById('newSection').value.trim();
-  if(newSec) {
-    firebase.database().ref(`sections/${newSec}`).set({
-      "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": []
-    });
-    populateSections();
-    alert("Section created!");
-  } else alert("Enter a section name");
+  if (!newSec) return alert("Enter a section name");
+
+  const days = { "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": [] };
+  db.ref(`sections/${newSec}`).set(days)
+    .then(() => { populateSections(); alert("Section created!"); });
 }
 
 // Add subject
@@ -194,15 +190,14 @@ function addSubject() {
   const day = document.getElementById('adminDaySelect').value;
   const subj = document.getElementById('subjectName').value.trim();
   const time = document.getElementById('subjectTime').value.trim();
+  if (!subj || !time) return alert("Enter subject and time");
 
-  if(subj && time) {
-    firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
-      const arr = snapshot.val() || [];
-      arr.push({subject: subj, time: time});
-      firebase.database().ref(`sections/${section}/${day}`).set(arr);
-      alert("Subject added!");
-    });
-  } else alert("Enter subject and time");
+  const ref = db.ref(`sections/${section}/${day}`);
+  ref.once('value').then(snapshot => {
+    const arr = snapshot.val() || [];
+    arr.push({subject: subj, time: time});
+    ref.set(arr).then(() => { alert("Subject added!"); });
+  });
 }
 
 // Delete last subject
@@ -210,13 +205,12 @@ function deleteLastSubject() {
   const section = document.getElementById('delSectionSelect').value;
   const day = document.getElementById('delDaySelect').value;
 
-  firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
+  const ref = db.ref(`sections/${section}/${day}`);
+  ref.once('value').then(snapshot => {
     const arr = snapshot.val() || [];
-    if(arr.length > 0) {
-      arr.pop();
-      firebase.database().ref(`sections/${section}/${day}`).set(arr);
-      alert("Last subject deleted!");
-    } else alert("No subject to delete");
+    if (arr.length === 0) return alert("No subject to delete");
+    arr.pop();
+    ref.set(arr).then(() => { alert("Last subject deleted!"); });
   });
 }
 
