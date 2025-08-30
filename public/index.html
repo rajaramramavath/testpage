@@ -1,94 +1,227 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Timetable Viewer</title>
+<meta charset="UTF-8">
+<title>Schedule Manager - Firebase</title>
+<style>
+body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+h2 { margin-top: 0; }
+table { border-collapse: collapse; width: 60%; margin-top: 10px; background: #fff; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+input, select, button { margin: 5px; padding: 5px; }
+#adminPanel { background: #fff; padding: 10px; margin-top: 20px; display: none; border: 1px solid #ccc; }
+</style>
 </head>
 <body>
-  <h1>Timetable</h1>
+
+<h2>View Schedule</h2>
+<label>Section:</label>
+<select id="sectionSelect"></select>
+
+<label>Day:</label>
+<select id="daySelect">
+  <option>Monday</option>
+  <option>Tuesday</option>
+  <option>Wednesday</option>
+  <option>Thursday</option>
+  <option>Friday</option>
+  <option>Saturday</option>
+</select>
+
+<button onclick="displaySchedule()">Show</button>
+
+<table id="scheduleTable">
+  <thead>
+    <tr>
+      <th>Subject</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<hr>
+
+<h2>Admin Login</h2>
+<label>Email:</label>
+<input type="email" id="adminEmail" placeholder="admin@example.com">
+<label>Password:</label>
+<input type="password" id="adminPassword">
+<button onclick="adminLogin()">Login</button>
+
+<div id="adminPanel">
+  <h3>Admin Panel</h3>
+
+  <h4>Create Section</h4>
+  <input type="text" id="newSection" placeholder="Section Name">
+  <button onclick="createSection()">Add Section</button>
+
+  <h4>Add Subject</h4>
   <label>Section:</label>
-  <select id="section"></select>
+  <select id="adminSectionSelect"></select>
   <label>Day:</label>
-  <select id="day">
-    <option>monday</option>
-    <option>tuesday</option>
-    <option>wednesday</option>
-    <option>thursday</option>
-    <option>friday</option>
-    <option>saturday</option>
+  <select id="adminDaySelect">
+    <option>Monday</option>
+    <option>Tuesday</option>
+    <option>Wednesday</option>
+    <option>Thursday</option>
+    <option>Friday</option>
+    <option>Saturday</option>
+  </select><br>
+  <input type="text" id="subjectName" placeholder="Subject Name">
+  <input type="text" id="subjectTime" placeholder="Time (e.g., 9:00-10:00)">
+  <button onclick="addSubject()">Add Subject</button>
+
+  <h4>Delete Subject</h4>
+  <label>Section:</label>
+  <select id="delSectionSelect"></select>
+  <label>Day:</label>
+  <select id="delDaySelect">
+    <option>Monday</option>
+    <option>Tuesday</option>
+    <option>Wednesday</option>
+    <option>Thursday</option>
+    <option>Friday</option>
+    <option>Saturday</option>
   </select>
-  <button id="load">Load</button>
+  <button onclick="deleteLastSubject()">Delete Last Subject</button>
+</div>
 
-  <ul id="output"></ul>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-  <script type="module">
-    import { db, ref, get } from './firebase.js';
+<script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
+  authDomain: "admindemon-b3823.firebaseapp.com",
+  databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com",
+  projectId: "admindemon-b3823",
+  storageBucket: "admindemon-b3823.appspot.com",
+  messagingSenderId: "33424574422",
+  appId: "1:33424574422:web:96db3c6388d89d162c4677",
+  measurementId: "G-188H3B2LSZ"
+};
 
-    async function loadSections() {
-      const snapshot = await get(ref(db, 'timetable'));
-      const sections = snapshot.exists() ? Object.keys(snapshot.val()) : [];
-      const sel = document.getElementById('section');
-      sel.innerHTML = sections.map(s => `<option>${s}</option>`).join('');
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+// Populate section dropdowns
+function populateSections() {
+  firebase.database().ref('sections').once('value', snapshot => {
+    const sections = snapshot.val() || {};
+    const sectionSelect = document.getElementById('sectionSelect');
+    const adminSectionSelect = document.getElementById('adminSectionSelect');
+    const delSectionSelect = document.getElementById('delSectionSelect');
+
+    sectionSelect.innerHTML = '';
+    adminSectionSelect.innerHTML = '';
+    delSectionSelect.innerHTML = '';
+
+    for (let section in sections) {
+      let opt1 = document.createElement('option'); opt1.value = section; opt1.textContent = section; sectionSelect.appendChild(opt1);
+      let opt2 = document.createElement('option'); opt2.value = section; opt2.textContent = section; adminSectionSelect.appendChild(opt2);
+      let opt3 = document.createElement('option'); opt3.value = section; opt3.textContent = section; delSectionSelect.appendChild(opt3);
     }
+  });
+}
 
-    async function loadTimetable() {
-      const section = document.getElementById('section').value;
-      const day = document.getElementById('day').value;
-      const snapshot = await get(ref(db, `timetable/${section}/${day}`));
-      const list = document.getElementById('output');
-      list.innerHTML = '';
-      if (snapshot.exists()) {
-        snapshot.val().forEach(item => {
-          const li = document.createElement('li');
-          li.textContent = `${item.time} — ${item.subject}`;
-          list.appendChild(li);
-        });
-      } else {
-        list.innerHTML = '<li>No data</li>';
-      }
+// Display schedule
+function displaySchedule() {
+  const section = document.getElementById('sectionSelect').value;
+  const day = document.getElementById('daySelect').value;
+  const tbody = document.getElementById('scheduleTable').querySelector('tbody');
+  tbody.innerHTML = '';
+
+  firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
+    const entries = snapshot.val() || [];
+    if (entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="2">No data</td></tr>';
+    } else {
+      entries.forEach(e => {
+        let row = `<tr><td>${e.subject}</td><td>${e.time}</td></tr>`;
+        tbody.innerHTML += row;
+      });
     }
+  });
+}
 
-    document.getElementById('load').addEventListener('click', loadTimetable);
+// Admin login
+function adminLogin() {
+  const email = document.getElementById('adminEmail').value;
+  const password = document.getElementById('adminPassword').value;
 
-    loadSections();
-  </script>
-<!-- index.html -->
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Timetable</title>
-</head>
-<body>
-  <h1>Timetable</h1>
+  auth.signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      document.getElementById('adminPanel').style.display = 'block';
+      populateSections();
+      alert("Admin logged in!");
+    })
+    .catch((error) => {
+      alert("Login failed: " + error.message);
+    });
+}
 
-  <!-- Firebase App (core) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"></script>
-  <!-- Add the Firebase products you need -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
+// Monitor auth state
+auth.onAuthStateChanged(user => {
+  if(user) {
+    document.getElementById('adminPanel').style.display = 'block';
+    populateSections();
+  } else {
+    document.getElementById('adminPanel').style.display = 'none';
+  }
+});
 
-  <script>
-    // Your web app's Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
-      authDomain: "admindemon-b3823.firebaseapp.com",
-      projectId: "admindemon-b3823",
-      storageBucket: "admindemon-b3823.firebasestorage.app",
-      messagingSenderId: "33424574422",
-      appId: "1:33424574422:web:96db3c6388d89d162c4677",
-      measurementId: "G-188H3B2LSZ"
-    };
+// Create section
+function createSection() {
+  const newSec = document.getElementById('newSection').value.trim();
+  if(newSec) {
+    firebase.database().ref(`sections/${newSec}`).set({
+      "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": []
+    });
+    populateSections();
+    alert("Section created!");
+  } else alert("Enter a section name");
+}
 
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const analytics = firebase.analytics(app);
-    const auth = firebase.auth(app);
-    const db = firebase.database(app);
+// Add subject
+function addSubject() {
+  const section = document.getElementById('adminSectionSelect').value;
+  const day = document.getElementById('adminDaySelect').value;
+  const subj = document.getElementById('subjectName').value.trim();
+  const time = document.getElementById('subjectTime').value.trim();
 
-    console.log("Firebase ready!");
-  </script>
-</body>
-</html>
+  if(subj && time) {
+    firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
+      const arr = snapshot.val() || [];
+      arr.push({subject: subj, time: time});
+      firebase.database().ref(`sections/${section}/${day}`).set(arr);
+      alert("Subject added!");
+    });
+  } else alert("Enter subject and time");
+}
 
+// Delete last subject
+function deleteLastSubject() {
+  const section = document.getElementById('delSectionSelect').value;
+  const day = document.getElementById('delDaySelect').value;
+
+  firebase.database().ref(`sections/${section}/${day}`).once('value', snapshot => {
+    const arr = snapshot.val() || [];
+    if(arr.length > 0) {
+      arr.pop();
+      firebase.database().ref(`sections/${section}/${day}`).set(arr);
+      alert("Last subject deleted!");
+    } else alert("No subject to delete");
+  });
+}
+
+// Initial load
+populateSections();
+</script>
 </body>
 </html>
