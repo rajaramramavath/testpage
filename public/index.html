@@ -1,254 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Schedule Manager - Firebase</title>
-<style>
-body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-h2 { margin-top: 0; }
-table { border-collapse: collapse; width: 60%; margin-top: 10px; background: #fff; }
-th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-input, select, button { margin: 5px; padding: 5px; }
-#adminPanel { background: #fff; padding: 10px; margin-top: 20px; display: none; border: 1px solid #ccc; }
-</style>
+  <meta charset="UTF-8">
+  <title>Class Schedule</title>
+  <script type="module">
+    // Firebase Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 🔑 Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
+      authDomain: "admindemon-b3823.firebaseapp.com",
+      databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com",
+      projectId: "admindemon-b3823",
+      storageBucket: "admindemon-b3823.appspot.com",
+      messagingSenderId: "33424574422",
+      appId: "1:33424574422:web:96db3c6388d89d162c4677",
+      measurementId: "G-188H3B2LSZ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadSections() {
+      const sectionSelect = document.getElementById("sectionSelect");
+      const snapshot = await getDocs(collection(db, "sections"));
+      snapshot.forEach(doc => {
+        const option = document.createElement("option");
+        option.value = doc.id;
+        option.textContent = doc.data().name;
+        sectionSelect.appendChild(option);
+      });
+    }
+
+    async function showSchedule() {
+      const sectionId = document.getElementById("sectionSelect").value;
+      const day = document.getElementById("daySelect").value;
+      if (!sectionId || !day) return;
+
+      const sectionDoc = await getDoc(doc(db, "sections", sectionId));
+      const subjects = sectionDoc.data().subjects?.[day] || [];
+      const scheduleDiv = document.getElementById("schedule");
+      scheduleDiv.innerHTML = "";
+
+      if (subjects.length === 0) {
+        scheduleDiv.textContent = "No subjects for this day.";
+        return;
+      }
+
+      subjects.forEach(sub => {
+        const div = document.createElement("div");
+        div.textContent = `${sub.time} - ${sub.name}`;
+        scheduleDiv.appendChild(div);
+      });
+    }
+
+    window.onload = loadSections;
+  </script>
 </head>
 <body>
-
-<h2>View Schedule</h2>
-<label>Section:</label>
-<select id="sectionSelect"></select>
-
-<label>Day:</label>
-<select id="daySelect">
-  <option>Monday</option>
-  <option>Tuesday</option>
-  <option>Wednesday</option>
-  <option>Thursday</option>
-  <option>Friday</option>
-  <option>Saturday</option>
-</select>
-
-<button onclick="displaySchedule()">Show</button>
-
-<table id="scheduleTable">
-  <thead>
-    <tr>
-      <th>Subject</th>
-      <th>Time</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
-
-<hr>
-
-<h2>Admin Login</h2>
-<label>Email:</label>
-<input type="email" id="adminEmail" placeholder="admin@example.com">
-<label>Password:</label>
-<input type="password" id="adminPassword">
-<button onclick="adminLogin()">Login</button>
-
-<div id="adminPanel">
-  <h3>Admin Panel</h3>
-
-  <h4>Create Section</h4>
-  <input type="text" id="newSection" placeholder="Section Name">
-  <button onclick="createSection()">Add Section</button>
-
-  <h4>Add Subject</h4>
-  <label>Section:</label>
-  <select id="adminSectionSelect"></select>
-  <label>Day:</label>
-  <select id="adminDaySelect">
-    <option>Monday</option>
-    <option>Tuesday</option>
-    <option>Wednesday</option>
-    <option>Thursday</option>
-    <option>Friday</option>
-    <option>Saturday</option>
-  </select><br>
-  <input type="text" id="subjectName" placeholder="Subject Name">
-  <input type="text" id="subjectTime" placeholder="Time (e.g., 9:00-10:00)">
-  <button onclick="addSubject()">Add Subject</button>
-
-  <h4>Delete Subject</h4>
-  <label>Section:</label>
-  <select id="delSectionSelect"></select>
-  <label>Day:</label>
-  <select id="delDaySelect">
-    <option>Monday</option>
-    <option>Tuesday</option>
-    <option>Wednesday</option>
-    <option>Thursday</option>
-    <option>Friday</option>
-    <option>Saturday</option>
-  </select>
-  <button onclick="deleteLastSubject()">Delete Last Subject</button>
-</div>
-
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-
-<script>
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
-  authDomain: "admindemon-b3823.firebaseapp.com",
-  databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com",
-  projectId: "admindemon-b3823",
-  storageBucket: "admindemon-b3823.appspot.com",
-  messagingSenderId: "33424574422",
-  appId: "1:33424574422:web:96db3c6388d89d162c4677",
-  measurementId: "G-188H3B2LSZ"
-};
-
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const auth = firebase.auth();
-
-// Populate all dropdowns with sections
-function populateSections() {
-  db.ref('sections').once('value')
-    .then(snapshot => {
-      const sections = snapshot.val() || {};
-      const sectionSelects = [
-        document.getElementById('sectionSelect'),
-        document.getElementById('adminSectionSelect'),
-        document.getElementById('delSectionSelect')
-      ];
-      
-      sectionSelects.forEach(sel => sel.innerHTML = '');
-
-      for (let section in sections) {
-        sectionSelects.forEach(sel => {
-          let opt = document.createElement('option');
-          opt.value = section;
-          opt.textContent = section;
-          sel.appendChild(opt);
-        });
-      }
-
-      // If no sections exist, show placeholder
-      if (Object.keys(sections).length === 0) {
-        sectionSelects.forEach(sel => {
-          let opt = document.createElement('option');
-          opt.textContent = "No sections";
-          opt.value = "";
-          sel.appendChild(opt);
-        });
-      }
-    })
-    .catch(err => console.error("Error loading sections:", err));
-}
-
-// Display schedule for selected section & day
-function displaySchedule() {
-  const section = document.getElementById('sectionSelect').value;
-  const day = document.getElementById('daySelect').value;
-  const tbody = document.getElementById('scheduleTable').querySelector('tbody');
-  tbody.innerHTML = '';
-
-  if (!section) return tbody.innerHTML = '<tr><td colspan="2">No section selected</td></tr>';
-
-  db.ref(`sections/${section}/${day}`).once('value')
-    .then(snapshot => {
-      const entries = snapshot.val() || [];
-      if (entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2">No data</td></tr>';
-      } else {
-        entries.forEach(e => {
-          const row = document.createElement('tr');
-          row.innerHTML = `<td>${e.subject}</td><td>${e.time}</td>`;
-          tbody.appendChild(row);
-        });
-      }
-    });
-}
-
-// Admin login
-function adminLogin() {
-  const email = document.getElementById('adminEmail').value;
-  const password = document.getElementById('adminPassword').value;
-
-  auth.signInWithEmailAndPassword(email, password)
-    .then(() => {
-      document.getElementById('adminPanel').style.display = 'block';
-      populateSections();
-      alert("Admin logged in!");
-    })
-    .catch(err => alert("Login failed: " + err.message));
-}
-
-// Auth state listener
-auth.onAuthStateChanged(user => {
-  document.getElementById('adminPanel').style.display = user ? 'block' : 'none';
-  if(user) populateSections();
-});
-
-// Create new section
-function createSection() {
-  const newSec = document.getElementById('newSection').value.trim();
-  if (!newSec) return alert("Enter a section name");
-
-  const days = { "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": [] };
-  
-  db.ref(`sections/${newSec}`).set(days)
-    .then(() => {
-      populateSections();
-      document.getElementById('newSection').value = '';
-      alert("Section created!");
-    })
-    .catch(err => alert("Error creating section: " + err.message));
-}
-
-// Add subject to section/day
-function addSubject() {
-  const section = document.getElementById('adminSectionSelect').value;
-  const day = document.getElementById('adminDaySelect').value;
-  const subj = document.getElementById('subjectName').value.trim();
-  const time = document.getElementById('subjectTime').value.trim();
-  if (!section || !subj || !time) return alert("Enter section, subject, and time");
-
-  const ref = db.ref(`sections/${section}/${day}`);
-  ref.once('value')
-    .then(snapshot => {
-      const arr = snapshot.val() || [];
-      arr.push({subject: subj, time: time});
-      return ref.set(arr);
-    })
-    .then(() => {
-      document.getElementById('subjectName').value = '';
-      document.getElementById('subjectTime').value = '';
-      alert("Subject added!");
-    })
-    .catch(err => alert("Error adding subject: " + err.message));
-}
-
-// Delete last subject
-function deleteLastSubject() {
-  const section = document.getElementById('delSectionSelect').value;
-  const day = document.getElementById('delDaySelect').value;
-
-  if (!section) return alert("Select a section");
-
-  const ref = db.ref(`sections/${section}/${day}`);
-  ref.once('value')
-    .then(snapshot => {
-      const arr = snapshot.val() || [];
-      if (arr.length === 0) return alert("No subject to delete");
-      arr.pop();
-      return ref.set(arr);
-    })
-    .then(() => alert("Last subject deleted!"))
-    .catch(err => alert("Error deleting subject: " + err.message));
-}
-
-// Only populate sections if user is already logged in
-auth.onAuthStateChanged(user => { if(user) populateSections(); });
-</script>
+  <h1>Class Schedule</h1>
+  <label>Section:
+    <select id="sectionSelect" onchange="showSchedule()">
+      <option value="">Select Section</option>
+    </select>
+  </label>
+  <br><br>
+  <label>Day:
+    <select id="daySelect" onchange="showSchedule()">
+      <option value="">Select Day</option>
+      <option>Monday</option>
+      <option>Tuesday</option>
+      <option>Wednesday</option>
+      <option>Thursday</option>
+      <option>Friday</option>
+      <option>Saturday</option>
+    </select>
+  </label>
+  <hr>
+  <div id="schedule"></div>
 </body>
 </html>
