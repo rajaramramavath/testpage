@@ -23,51 +23,78 @@
       measurementId: "G-188H3B2LSZ"
     };
 
+    // ✅ Init Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // ----------------- LOGIN -----------------
     async function login() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        console.log("✅ Logged in:", userCred.user.email);
       } catch (err) {
+        console.error("❌ Login failed:", err);
         alert("Login failed: " + err.message);
       }
     }
 
     function logout() {
-      signOut(auth);
+      signOut(auth).then(() => {
+        console.log("✅ Logged out");
+      });
     }
 
+    // ----------------- SECTIONS -----------------
     async function loadSections() {
       const select = document.getElementById("sectionSelect");
       select.innerHTML = "<option value=''>Select Section</option>";
-      const snapshot = await getDocs(collection(db, "sections"));
-      snapshot.forEach(docSnap => {
-        const opt = document.createElement("option");
-        opt.value = docSnap.id;
-        opt.textContent = docSnap.data().name;
-        select.appendChild(opt);
-      });
+      try {
+        const snapshot = await getDocs(collection(db, "sections"));
+        snapshot.forEach(docSnap => {
+          const opt = document.createElement("option");
+          opt.value = docSnap.id;
+          opt.textContent = docSnap.data().name;
+          select.appendChild(opt);
+        });
+        console.log("✅ Sections loaded:", snapshot.size);
+      } catch (err) {
+        console.error("❌ Error loading sections:", err);
+      }
     }
 
     async function createSection() {
       const name = document.getElementById("newSection").value;
       if (!name) return alert("Enter section name");
-      await addDoc(collection(db, "sections"), { name, subjects: {} });
-      document.getElementById("newSection").value = "";
-      loadSections();
+      try {
+        await addDoc(collection(db, "sections"), { name, subjects: {} });
+        document.getElementById("newSection").value = "";
+        alert("✅ Section created!");
+        console.log("✅ Section created:", name);
+        loadSections();
+      } catch (err) {
+        console.error("❌ Error creating section:", err);
+        alert("Error creating section: " + err.message);
+      }
     }
 
     async function deleteSection() {
       const id = document.getElementById("sectionSelect").value;
       if (!id) return alert("Select section");
-      await deleteDoc(doc(db, "sections", id));
-      loadSections();
+      try {
+        await deleteDoc(doc(db, "sections", id));
+        alert("✅ Section deleted");
+        console.log("✅ Section deleted:", id);
+        loadSections();
+      } catch (err) {
+        console.error("❌ Error deleting section:", err);
+        alert("Error deleting section: " + err.message);
+      }
     }
 
+    // ----------------- SUBJECTS -----------------
     async function addSubject() {
       const id = document.getElementById("sectionSelect").value;
       const day = document.getElementById("day").value;
@@ -76,20 +103,24 @@
 
       if (!id || !day || !name || !time) return alert("Fill all fields");
 
-      // Fetch current data
-      const snapshot = await getDocs(collection(db, "sections"));
-      const sectionDoc = snapshot.docs.find(d => d.id === id);
-      const data = sectionDoc.data();
+      try {
+        const snapshot = await getDocs(collection(db, "sections"));
+        const sectionDoc = snapshot.docs.find(d => d.id === id);
+        const data = sectionDoc.data();
 
-      if (!data.subjects) data.subjects = {};
-      if (!data.subjects[day]) data.subjects[day] = [];
-      data.subjects[day].push({ name, time });
+        if (!data.subjects) data.subjects = {};
+        if (!data.subjects[day]) data.subjects[day] = [];
+        data.subjects[day].push({ name, time });
 
-      await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
-
-      alert("Subject added");
-      document.getElementById("subjectName").value = "";
-      document.getElementById("subjectTime").value = "";
+        await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
+        alert("✅ Subject added");
+        console.log("✅ Subject added:", { name, time, day });
+        document.getElementById("subjectName").value = "";
+        document.getElementById("subjectTime").value = "";
+      } catch (err) {
+        console.error("❌ Error adding subject:", err);
+        alert("Error adding subject: " + err.message);
+      }
     }
 
     async function deleteSubject() {
@@ -99,28 +130,43 @@
 
       if (!id || !day || !name) return alert("Fill all fields");
 
-      const snapshot = await getDocs(collection(db, "sections"));
-      const sectionDoc = snapshot.docs.find(d => d.id === id);
-      const data = sectionDoc.data();
+      try {
+        const snapshot = await getDocs(collection(db, "sections"));
+        const sectionDoc = snapshot.docs.find(d => d.id === id);
+        const data = sectionDoc.data();
 
-      if (!data.subjects || !data.subjects[day]) return alert("No subjects found");
+        if (!data.subjects || !data.subjects[day]) {
+          alert("❌ No subjects found for this day");
+          return;
+        }
 
-      data.subjects[day] = data.subjects[day].filter(s => s.name !== name);
+        data.subjects[day] = data.subjects[day].filter(s => s.name !== name);
 
-      await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
-
-      alert("Subject deleted");
-      document.getElementById("subjectName").value = "";
+        await updateDoc(doc(db, "sections", id), { subjects: data.subjects });
+        alert("✅ Subject deleted");
+        console.log("✅ Subject deleted:", { name, day });
+        document.getElementById("subjectName").value = "";
+      } catch (err) {
+        console.error("❌ Error deleting subject:", err);
+        alert("Error deleting subject: " + err.message);
+      }
     }
 
-    // Handle login state
+    // ----------------- AUTH STATE -----------------
     onAuthStateChanged(auth, user => {
-      document.getElementById("loginForm").style.display = user ? "none" : "block";
-      document.getElementById("adminPanel").style.display = user ? "block" : "none";
-      if (user) loadSections();
+      if (user) {
+        console.log("👤 Logged in user:", user.email);
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("adminPanel").style.display = "block";
+        loadSections();
+      } else {
+        console.log("👤 No user logged in");
+        document.getElementById("loginForm").style.display = "block";
+        document.getElementById("adminPanel").style.display = "none";
+      }
     });
 
-    // Expose to window
+    // Expose functions to HTML
     window.login = login;
     window.logout = logout;
     window.createSection = createSection;
