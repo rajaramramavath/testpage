@@ -1,69 +1,55 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Firebase RD Test</title>
-    <script type="module">
-      // Import Firebase SDKs
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-      import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
-      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  <form id="loginForm">
+    <input type="email" id="email" placeholder="Admin Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <button type="submit">Login</button>
+  </form>
 
-      // Your Firebase config (keep what you already have)
-      const firebaseConfig = {
-        apiKey: "AIzaSyBEfI4QzJU2kc2PEp02x36BftvO6P5qJps",
-        authDomain: "admindemon-b3823.firebaseapp.com",
-        projectId: "admindemon-b3823",
-        storageBucket: "admindemon-b3823.firebasestorage.app",
-        messagingSenderId: "33424574422",
-        appId: "1:33424574422:web:96db3c6388d89d162c4677",
-        measurementId: "G-188H3B2LSZ",
-        databaseURL: "https://admindemon-b3823-default-rtdb.firebaseio.com"
-      };
+  <form id="uploadForm" style="display:none;">
+    <textarea id="content" placeholder="Enter content..."></textarea>
+    <button type="submit">Upload</button>
+  </form>
 
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
-      const auth = getAuth(app);
+  <script type="module">
+    import { auth, db } from './firebase-init.js';
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import { ref, push } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
 
-      // --- Change this to your admin test email and password ---
-      const TEST_EMAIL = "YOUR_ADMIN_EMAIL";
-      const TEST_PASSWORD = "YOUR_ADMIN_PASSWORD";
+    const loginForm = document.getElementById('loginForm');
+    const uploadForm = document.getElementById('uploadForm');
 
-      // Login and test write/read
-      signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
-        .then(() => {
-          console.log("Logged in!");
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        alert('Logged in!');
+        loginForm.style.display = 'none';
+        uploadForm.style.display = 'block';
+      } catch (err) {
+        alert('Login failed: ' + err.message);
+      }
+    });
 
-          const testRef = ref(db, 'testNode');
-
-          // Write test data
-          return set(testRef, {
-            message: "Hello Firebase! " + new Date().toISOString()
-          });
-        })
-        .then(() => {
-          console.log("Write successful. Now reading...");
-          const testRef = ref(db, 'testNode');
-          return get(testRef);
-        })
-        .then((snapshot) => {
-          if (snapshot.exists()) {
-            console.log("Read data:", snapshot.val());
-          } else {
-            console.log("No data found!");
-          }
-        })
-        .catch((err) => {
-          console.error("Error:", err);
-        });
-
-      // Optional: sign out after test
-      // signOut(auth);
-    </script>
-  </head>
-  <body>
-    <h1>Firebase RD Test</h1>
-    <p>Open the browser console (F12) to see results.</p>
-  </body>
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const content = document.getElementById('content').value;
+      try {
+        await push(ref(db, 'posts'), { text: content, timestamp: Date.now() });
+        alert('Content uploaded!');
+        document.getElementById('content').value = '';
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      }
+    });
+  </script>
+</body>
 </html>
